@@ -25,6 +25,11 @@
 #include <mpi.h>
 #endif
 
+#ifdef HPCG_ENABLE_CALIPER
+#include <adiak.hpp>
+#include <caliper/cali.h>
+#endif
+
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
@@ -71,7 +76,6 @@ using std::endl;
 
 */
 int main(int argc, char * argv[]) {
-
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
 #endif
@@ -80,6 +84,27 @@ int main(int argc, char * argv[]) {
 
   HPCG_Init(&argc, &argv, params);
 
+#ifdef HPCG_ENABLE_CALIPER
+  cali_config_set("CALI_CALIPER_ATTRIBUTE_DEFAULT_SCOPE", "process");
+
+  void* hpcg_adiak_comm_ptr = nullptr;
+#ifndef HPCG_NO_MPI
+  MPI_Comm hpcg_adiak_comm = MPI_COMM_WORLD;
+  hpcg_adiak_comm_ptr = &hpcg_adiak_comm;
+#endif
+  adiak::init(hpcg_adiak_comm_ptr);
+  adiak::collect_all();
+
+  adiak::value("threads", params.numThreads);
+  adiak::value("hpcg.n", std::array<int, 3> { params.nx, params.ny, params.nz });
+  adiak::value("hpcg.np", std::array<int, 3> { params.npx, params.npy, params.npz });
+  adiak::value("hpcg.pz", params.pz);
+  adiak::value("hpcg.zl", params.zl);
+  adiak::value("hpcg.zu", params.zu);
+  adiak::value("hpcg.runningTime", params.runningTime);
+
+  CALI_CXX_MARK_FUNCTION;
+#endif
   // Check if QuickPath option is enabled.
   // If the running time is set to zero, we minimize all paths through the program
   bool quickPath = (params.runningTime==0);
@@ -113,6 +138,9 @@ int main(int argc, char * argv[]) {
   // Problem setup Phase //
   /////////////////////////
 
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_BEGIN("Setup");
+#endif
 #ifdef HPCG_DEBUG
   double t1 = mytimer();
 #endif
@@ -145,6 +173,9 @@ int main(int argc, char * argv[]) {
 
   setup_time = mytimer() - setup_time; // Capture total time of setup
   times[9] = setup_time; // Save it for reporting
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_END("Setup");
+#endif
 
   curLevelMatrix = &A;
   Vector * curb = &b;
@@ -167,6 +198,9 @@ int main(int argc, char * argv[]) {
   ////////////////////////////////////
   // Reference SpMV+MG Timing Phase //
   ////////////////////////////////////
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_BEGIN("Reference SpMV+MG Timing");
+#endif
 
   // Call Reference SpMV and MG. Compute Optimization time as ratio of times in these routines
 
@@ -200,6 +234,10 @@ int main(int argc, char * argv[]) {
   // Reference CG Timing Phase //
   ///////////////////////////////
 
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_END("Reference SpMV+MG Timing");
+  CALI_MARK_BEGIN("Reference CG Timing");
+#endif
 #ifdef HPCG_DEBUG
   t1 = mytimer();
 #endif
@@ -243,6 +281,10 @@ int main(int argc, char * argv[]) {
   // Validation Testing Phase //
   //////////////////////////////
 
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_END("Reference CG Timing");
+  CALI_MARK_BEGIN("Validation Testing");
+#endif
 #ifdef HPCG_DEBUG
   t1 = mytimer();
 #endif
@@ -264,7 +306,10 @@ int main(int argc, char * argv[]) {
   //////////////////////////////
   // Optimized CG Setup Phase //
   //////////////////////////////
-
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_END("Validation Testing");
+  CALI_MARK_BEGIN("Optimized CG Setup");
+#endif
   niters = 0;
   normr = 0.0;
   normr0 = 0.0;
@@ -310,7 +355,10 @@ int main(int argc, char * argv[]) {
   ///////////////////////////////
   // Optimized CG Timing Phase //
   ///////////////////////////////
-
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_END("Optimized CG Setup");
+  CALI_MARK_BEGIN("Optimized CG Timing");
+#endif
   // Here we finally run the benchmark phase
   // The variable total_runtime is the target benchmark execution time in seconds
 
@@ -339,7 +387,9 @@ int main(int argc, char * argv[]) {
     if (rank==0) HPCG_fout << "Call [" << i << "] Scaled Residual [" << normr/normr0 << "]" << endl;
     testnorms_data.values[i] = normr/normr0; // Record scaled residual from this run
   }
-
+#ifdef HPCG_ENABLE_CALIPER
+  CALI_MARK_END("Optimized CG Timing");
+#endif
   // Compute difference between known exact solution and computed solution
   // All processors are needed here.
 #ifdef HPCG_DEBUG
@@ -372,6 +422,10 @@ int main(int argc, char * argv[]) {
 
 
   HPCG_Finalize();
+
+#ifdef HPCG_ENABLE_MPI
+  adiak::fini();
+#endif
 
   // Finish up
 #ifndef HPCG_NO_MPI
