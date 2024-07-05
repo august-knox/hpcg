@@ -34,6 +34,10 @@ using std::endl;
 #include "hpcg.hpp"
 #endif
 
+#ifdef HPCG_ENABLE_CALIPER
+#include <adiak.hpp>
+#endif
+
 /*!
  Creates a YAML file and writes the information about the HPCG run, its results, and validity.
 
@@ -215,6 +219,11 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
     doc.get("Machine Summary")->add("Distributed Processes",A.geom->size);
     doc.get("Machine Summary")->add("Threads per processes",A.geom->numThreads);
 
+#ifdef HPCG_ENABLE_CALIPER
+    adiak::value("Distributed Processes", A.geom->size);
+    adiak::value("Threads per Process", A.geom->numThreads);
+#endif
+
     doc.add("Global Problem Dimensions","");
     doc.get("Global Problem Dimensions")->add("Global nx",A.geom->gnx);
     doc.get("Global Problem Dimensions")->add("Global ny",A.geom->gny);
@@ -228,6 +237,11 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
     doc.add("Local Domain Dimensions","");
     doc.get("Local Domain Dimensions")->add("nx",A.geom->nx);
     doc.get("Local Domain Dimensions")->add("ny",A.geom->ny);
+
+#ifdef HPCG_ENABLE_CALIPER
+    adiak::value("Global Problem Dimensions", std::array<long long int,3> { A.geom->gnx, A.geom->gny, A.geom->gnz });
+    adiak::value("Processor Dimensions", std::array<int,3> { A.geom->npx, A.geom->npy, A.geom->npz });
+#endif
 
     int ipartz_ids = 0;
     for (int i=0; i< A.geom->npartz; ++i) {
@@ -326,6 +340,10 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
     doc.get("Benchmark Time Summary")->add("SpMV",times[3]);
     doc.get("Benchmark Time Summary")->add("MG",times[5]);
     doc.get("Benchmark Time Summary")->add("Total",times[0]);
+
+#ifdef HPGC_ENABLE_CALIPER
+    adiak::value("Total time", times[0]);
+#endif
 
     doc.add("Floating Point Operations Summary","");
     doc.get("Floating Point Operations Summary")->add("Raw DDOT",fnops_ddot);

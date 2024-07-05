@@ -95,14 +95,6 @@ int main(int argc, char * argv[]) {
   adiak::init(hpcg_adiak_comm_ptr);
   adiak::collect_all();
 
-  adiak::value("threads", params.numThreads);
-  adiak::value("hpcg.n", std::array<int, 3> { params.nx, params.ny, params.nz });
-  adiak::value("hpcg.np", std::array<int, 3> { params.npx, params.npy, params.npz });
-  adiak::value("hpcg.pz", params.pz);
-  adiak::value("hpcg.zl", params.zl);
-  adiak::value("hpcg.zu", params.zu);
-  adiak::value("hpcg.runningTime", params.runningTime);
-
   CALI_CXX_MARK_FUNCTION;
 #endif
   // Check if QuickPath option is enabled.
