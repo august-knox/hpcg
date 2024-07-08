@@ -241,6 +241,7 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
 #ifdef HPCG_ENABLE_CALIPER
     adiak::value("Global Problem Dimensions", std::array<long long int,3> { A.geom->gnx, A.geom->gny, A.geom->gnz });
     adiak::value("Processor Dimensions", std::array<int,3> { A.geom->npx, A.geom->npy, A.geom->npz });
+    adiak::value("Local Domain Dimensions", std::array<int,3> { A.geom->nx, A.geom->ny, A.geom->nz });
 #endif
 
     int ipartz_ids = 0;
