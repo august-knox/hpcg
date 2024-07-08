@@ -77,3 +77,5 @@ if (HPCG_ENABLE_CALIPER)
     target_link_libraries(xhpcg adiak::adiak caliper)
     target_compile_definitions(xhpcg PRIVATE HPCG_ENABLE_CALIPER)
 endif()
+
+install(TARGETS xhpcg DESTINATION ${CMAKE_INSTALL_BINDIR})
