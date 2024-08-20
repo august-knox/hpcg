@@ -36,6 +36,7 @@ using std::endl;
 
 #ifdef HPCG_ENABLE_CALIPER
 #include <adiak.hpp>
+#include <string>
 #endif
 
 /*!
@@ -220,8 +221,9 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
     doc.get("Machine Summary")->add("Threads per processes",A.geom->numThreads);
 
 #ifdef HPCG_ENABLE_CALIPER
-    adiak::value("Distributed Processes", A.geom->size);
-    adiak::value("Threads per Process", A.geom->numThreads);
+    adiak::value("HPCG-Benchmark::Version", "3.1");
+    adiak::value("Machine::Distributed Processes", A.geom->size);
+    adiak::value("Machine::Threads per Process", A.geom->numThreads);
 #endif
 
     doc.add("Global Problem Dimensions","");
@@ -272,8 +274,22 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
       doc.get("Multigrid Information")->get("Coarse Grids")->add("Number of Nonzero Terms",Af->Ac->totalNumberOfNonzeros);
       doc.get("Multigrid Information")->get("Coarse Grids")->add("Number of Presmoother Steps",Af->mgData->numberOfPresmootherSteps);
       doc.get("Multigrid Information")->get("Coarse Grids")->add("Number of Postsmoother Steps",Af->mgData->numberOfPostsmootherSteps);
+#ifdef HPCG_ENABLE_CALIPER
+      std::string prefix("Multigrid::Level ");
+      prefix.append(std::to_string(i)).append("::");
+      adiak::value(prefix+std::string("Number of Equations"), Af->Ac->totalNumberOfRows);
+      adiak::value(prefix+std::string("Number of Nonzero Terms"), Af->Ac->totalNumberOfNonzeros);
+      adiak::value(prefix+std::string("Number of Presmoother Steps"), Af->mgData->numberOfPresmootherSteps);
+      adiak::value(prefix+std::string("Number of Postmoother Steps"), Af->mgData->numberOfPostsmootherSteps);
+#endif
       Af = Af->Ac;
     }
+
+#ifdef HPCG_ENABLE_CALIPER
+    adiak::value("Linear System::Number of Equations", A.totalNumberOfRows);
+    adiak::value("Linear System::Number of Nonzero Terms", A.totalNumberOfNonzeros);
+    adiak::value("Multigrid::Number of coarse grid levels", numberOfMgLevels-1);
+#endif
 
     doc.add("########## Memory Use Summary  ##########","");
 
@@ -342,9 +358,6 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
     doc.get("Benchmark Time Summary")->add("MG",times[5]);
     doc.get("Benchmark Time Summary")->add("Total",times[0]);
 
-#ifdef HPGC_ENABLE_CALIPER
-    adiak::value("Total time", times[0]);
-#endif
 
     doc.add("Floating Point Operations Summary","");
     doc.get("Floating Point Operations Summary")->add("Raw DDOT",fnops_ddot);
@@ -372,6 +385,28 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
     double totalGflops = frefnops/(times[0]+fNumberOfCgSets*(times[7]/10.0+times[9]/10.0))/1.0E9;
     double totalGflops24 = frefnops/(times[0]+fNumberOfCgSets*times[7]/10.0)/1.0E9;
     doc.get("GFLOP/s Summary")->add("Total with convergence and optimization phase overhead",totalGflops);
+
+#ifdef HPCG_ENABLE_CALIPER
+    adiak::value("Memory::Total Data (GBytes)", fnbytes/1000000000.0);
+    adiak::value("Memory::OptimizeProblem Data (GBytes)", fnbytes_OptimizedProblem/1000000000.0);
+    adiak::value("Memory::Bytes Per Equation", fnbytesPerEquation);
+    adiak::value("Iteration Count::Result", global_failure ? "FAILED" : "PASSED");
+    adiak::value("Iteration Count::Reference CG iterations per set", refMaxIters);
+    adiak::value("Iteration Count::Optimized CG iterations per set", optMaxIters);
+    adiak::value("Iteration Count::Total reference iterations", refMaxIters*numberOfCgSets);
+    adiak::value("Iteration Count::Total optimized iterations", optMaxIters*numberOfCgSets);
+    adiak::value("FLOPS::Raw DDOT", fnops_ddot);
+    adiak::value("FLOPS::Raw WAXPBY", fnops_waxpby);
+    adiak::value("FLOPS::Raw SpMV", fnops_sparsemv);
+    adiak::value("FLOPS::Raw MG", fnops_precond);
+    adiak::value("FLOPS::Total", fnops);
+    adiak::value("FLOPS::Total with convergence overhead", frefnops);
+    adiak::value("GB/s Summary::Raw Read B/W", fnreads/times[0]/1.0E9);
+    adiak::value("GB/s Summary::Raw Write B/W", fnwrites/times[0]/1.0E9);
+    adiak::value("GB/s Summary::Raw Total B/W", (fnreads+fnwrites)/times[0]/1.0E9);
+    adiak::value("GB/s Summary::Total with convergence and optimization phase overhead",
+      (frefnreads+frefnwrites)/(times[0]+fNumberOfCgSets*(times[7]/10.0+times[9]/10.0))/1.0E9);
+#endif
 
     doc.add("User Optimization Overheads","");
     doc.get("User Optimization Overheads")->add("Optimization phase time (sec)", (times[7]));
@@ -418,9 +453,17 @@ void ReportResults(const SparseMatrix & A, int numberOfMgLevels, int numberOfCgS
           doc.get("Final Summary")->add("Official results execution time (sec) must be at least",minOfficialTime);
         }
       }
+#ifdef HPCG_ENABLE_CALIPER
+      adiak::value("Final Summary::Result", "Valid");
+      adiak::value("Final Summary::GFLOP/s", totalGflops);
+      adiak::value("Final Summary::Total time", times[0]);
+#endif
     } else {
       doc.get("Final Summary")->add("HPCG result is","INVALID.");
       doc.get("Final Summary")->add("Please review the YAML file contents","You may NOT submit these results for consideration.");
+#ifdef HPCG_ENABLE_CALIPER
+      adiak::value("Final Summary::Result", "Invalid");
+#endif
     }
 
     std::string yaml = doc.generate();
